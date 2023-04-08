@@ -3,26 +3,33 @@
 #define RIGHT_F 6
 #define RIGHT_B 9
 
-int maxSpeed = 75; // from 0 to 100
+#define BUTTON_PIN 7
+
+int maxSpeed = 50; // from 0 to 100
 
 int gridLength = 30; // in centimeters
-int delayAfterMove = 500; // in milliseconds
+int delayAfterMove = 1000; // in milliseconds
 
-int forwardTime = 700;
+int forwardTime = 735;
 int rightTurnTime = 260;
 int leftTurnTime = 260;
 
-float rightWeight = 0.995;
+float rightWeight = 0.9;
 float leftWeight = 1;
 
 void setup() {
+  Serial.begin(9600);
   pinMode(LEFT_F, OUTPUT);
   pinMode(LEFT_B, OUTPUT);
   pinMode(RIGHT_F, OUTPUT);
   pinMode(RIGHT_B, OUTPUT);
+
+  pinMode(BUTTON_PIN, INPUT);
+
+  /*
   Serial.begin(9600);
   delay(2000);
-  String directions = "FFFF";
+  String directions = "F";
 //  "FRFLFRFRFRFLFRFR";
   for (int i = 0; i < directions.length(); i++) {
     if (directions[i] == 'F') {
@@ -33,25 +40,24 @@ void setup() {
       left90Deg();
     }
   }
-//  forwardOneGrid();
-//  right90Deg();
-//  forwardOneGrid();
-//  left90Deg();
-//  forwardOneGrid();
-//  right90Deg();
-//  forwardOneGrid();
-//  right90Deg();
-//  forwardOneGrid();
-//  right90Deg();
-//  forwardOneGrid();
-//  left90Deg();
-//  forwardOneGrid();
-//  right90Deg();
-//  forwardOneGrid();
-//  right90Deg();
+  */
 }
 
 void loop() {
+  int state = digitalRead(BUTTON_PIN);
+  if (state == HIGH) {
+    delay(2000);
+    String directions = "FFF";
+    for (int i = 0; i < directions.length(); i++) {
+      if (directions[i] == 'F') {
+        forwardOneGrid();
+      } else if (directions[i] == 'R') {
+        right90Deg();
+      } else if (directions[i] == 'L') {
+        left90Deg();
+      }  
+    }
+  }
 }
 
 void forwardOneGrid() {
