@@ -8,7 +8,7 @@
 #define RIGHT_B 8
 #define RIGHT_E 9
 
-int maxSpeed = 27; // from 0 to 100
+int maxSpeed = 100; // from 0 to 100
 
 void setup() {
   pinMode(IR_LEFT, INPUT);
@@ -34,7 +34,7 @@ void loop() {
   } else {
     stopCar();
   }
-    
+  
   delay(1);
 }
 
