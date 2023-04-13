@@ -30,9 +30,6 @@ while True:
 
 
 
-
-
-
 arduino.close()
 
 # nearby_devices = bluetooth.discover_devices(duration=5, flush_cache=True, lookup_names=True, lookup_class=False, device_id=-1)
