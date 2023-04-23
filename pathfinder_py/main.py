@@ -1,126 +1,152 @@
 import serial
-from collections import deque
+from pathplanning import next_cell, search_bfs, convert_path_to_instructions, in_bound, is_obstacle, update_position
+from visualizer import display_grid
 
-DIRS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-PORT = "COM4"
+PORT = "COM4"  # "COM4" for BT, "COM6" for arduino
 
-# port = "COM4"  # "COM4" for BT, "COM6" for arduino
-# arduino = serial.Serial(port, 9600, timeout=2)
-# print("Connected.")
-# arduino.flushInput()
-#
-# def read():
-#     return arduino.readline().decode('utf-8').rstrip()
-#
-#
-# def write(x):
-#     arduino.write(bytes(x, 'utf-8'))
+print("Welcome to Pathfinder.")
+print("Arduino connecting...")
+arduino = serial.Serial(PORT, 9600, timeout=2)
+arduino.flushInput()
+print("Connection established.")
+
 
 def main():
-    print("Welcome to Pathfinder.")
-    # print("Arduino connecting...")
-    # arduino = serial.Serial(PORT, 9600, timeout=2)
-    # arduino.flushInput()
-    # print("Connected.")
+    # command = ""
+    # while command != "Quit":
+    #     command = input()
+    #     write(arduino, command)
+    #     print(read(arduino))
+    #
+    # arduino.close()
 
-    m, n = [int(x) for x in input("Rows, columns: ").split(" ")]
-    cur = tuple([int(x) for x in input("Start coordinate: ").split(" ")])
+    m, n = 5, 4
+    # m, n = [int(x) for x in input("Rows, columns: ").split(" ")]
+    grid = [[0] * n for _ in range(m)]
+
+    # x, y = 2, 0
+    # end = (4, 3)
+    x, y = tuple([int(x) for x in input("Start coordinate: ").split(" ")])
     end = tuple([int(x) for x in input("Target coordinate: ").split(" ")])
     cur_dir = int(input("Start direction: "))
     end_dir = int(input("End direction: "))
+    print("Enter location of obstacles (finish with -1): ")
 
-    grid = [[0] * n for _ in range(m)]
-
-    while cur != end or cur_dir != end_dir:
-        path = search_bfs(grid, cur, end)
-        if path == -1:
-            print("No path found")
-        instructions = convert_path_to_instructions(path, cur_dir, end_dir)
-        for instruction in instructions:
-            
-
-
-
-def search_bfs(grid, start, end):
-    q = deque([(start, [start])])  #
-    visited = {start}
-
-    while q:
-        (x, y), path = q.popleft()
-        if (x, y) == end:
-            return path
-        for dx, dy in DIRS:
-            nx, ny = x + dx, y + dy
-            if not in_bound(grid, nx, ny) or (nx, ny) in visited or grid[nx][ny] == 1:
-                continue
-            new_path = list(path)
-            new_path.append((nx, ny))
-            q.append(((nx, ny), new_path))
-            visited.add((nx, ny))
-
-    return -1
-
-
-def create_graph(grid):
-    graph = {}  # cell : [neighboring cells]
-
-    for x in range(len(grid)):
-        for y in range(len(grid[0])):
-            if grid[x][y] == 1:  # Cell is obstacle, skip
-                continue
-            for dx, dy in DIRS:  # Cell is not obstacle, connect to neighbors
-                nx, ny = x + dx, y + dy
-                if in_bound(grid, nx, ny) and grid[nx][ny] == 0:
-                    graph.setdefault((x, y), []).append((nx, ny))
-
-
-def in_bound(grid, x, y):
-    return 0 <= x < len(grid) and 0 <= y < len(grid[0])
-
-
-def convert_path_to_instructions(path, start_dir, end_dir):
-    cur_dir = start_dir
-    instructions = []
-
-    for i in range(len(path) - 1):
-        dx = path[i + 1][0] - path[i][0]
-        dy = path[i + 1][1] - path[i][1]
-        if dx == 0 and dy == 1:
-            target_dir = 1
-        elif dx == 1 and dy == 0:
-            target_dir = 2
-        elif dx == 0 and dy == -1:
-            target_dir = 3
+    while True:
+        location = input()
+        if location == "-1":
+            break
+        a, b = [int(x) for x in location.split(" ")]
+        if in_bound(grid, a, b):
+            grid[a][b] = 1
         else:
-            target_dir = 0
+            print("Invalid location.")
 
-        # rotate to correct direction
-        turn_type, turn_num = calculate_turns(cur_dir, target_dir)
-        instructions.extend([turn_type for _ in range(turn_num)])
+    display_grid(grid, x, y, cur_dir)
+    print("Grid initialized.")
 
-        # move forward
-        instructions.append("F")
+    path = search_bfs(grid, (x, y), end)
+    instructions = convert_path_to_instructions(path, cur_dir, end_dir)
 
-        # update direction
-        cur_dir = target_dir
+    print("".join(instructions))
+    input("Enter S to start navigation.")
 
-    # rotate to correct direction in the end
-    turn_type, turn_num = calculate_turns(cur_dir, end_dir)
-    instructions.extend([turn_type for _ in range(turn_num)])
+    while (x, y) != end or cur_dir != end_dir:
+        if grid_is_outdated(grid, x, y, cur_dir):
+            print("Grid Updated. New grid:")
+            display_grid(grid, x, y, cur_dir)
 
-    return instructions
+            path = search_bfs(grid, (x, y), end)
+            if len(path) == 0:
+                print("No path found. Quitting...")
+                return
+
+            instructions = convert_path_to_instructions(path, cur_dir, end_dir)
+
+        instruction = instructions.pop(0)
+        print("Current instruction: {}".format(instruction))
+        execute_instruction(instruction)
+        print("Executed")
+        # print("{} {} {}".format(x, y, cur_dir))
+        x, y, cur_dir = update_position(x, y, cur_dir, instruction)
+        display_grid(grid, x, y, cur_dir)
+
+    print("Destination reached.")
 
 
-def calculate_turns(cur_dir, target_dir):
-    left_turn_num = (cur_dir - target_dir) % 4
-    right_turn_num = (target_dir - cur_dir) % 4
-    if left_turn_num < right_turn_num:
-        return "L", left_turn_num
+def execute_instruction(instruction):
+    write(instruction)
+    read()
+
+
+def grid_is_outdated(grid, x, y, cur_dir):
+    nx, ny = next_cell(grid, x, y, cur_dir)
+    if not in_bound(grid, nx, ny):
+        return False
+    write("D")
+    sees_obstacle = read()
+    print(sees_obstacle)
+    if sees_obstacle == "Yes":
+        if is_obstacle(grid, nx, ny):
+            return False
+        grid[nx][ny] = 1
+        return True
     else:
-        return "R", right_turn_num
+        if not is_obstacle(grid, nx, ny):
+            return False
+        grid[nx][ny] = 0
+        return True
 
 
-main()
+def read_instant():
+    return arduino.readline().decode('utf-8').rstrip()
+
+
+def write(msg):
+    arduino.write(bytes(msg, 'utf-8'))
+
+
+def read():
+    while True:
+        s = read_instant()
+        if s != "":
+            arduino.flushInput()
+            return s
+
+
+def test():
+    grid = [[0, 0, 0],
+            [0, 0, 0]]
+    display_grid(grid, 0, 1, 0)
+
+    # while True:
+    #
+    #
+
+
+# test()
+command = ""
+while command != "quit":
+
+    command = input("Navigate again?\n")
+    if command == "override":
+        while True:
+            instruction = input()
+            if instruction == "quit":
+                break
+            elif instruction == "D":
+                write("D")
+                sees_obstacle = read()
+                arduino.flushInput()
+                print(sees_obstacle)
+            else:
+                execute_instruction(instruction)
+
+    main()
+
+# main()
+
+
 # m = 3
 # n = 3
 # grid = [[0] * m for _ in range(n)]
