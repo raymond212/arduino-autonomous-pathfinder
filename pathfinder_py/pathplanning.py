@@ -3,6 +3,24 @@ from collections import deque
 DIRS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
 
+def update_position(x, y, cur_dir, instruction):
+    if instruction == "L":
+        return x, y, (cur_dir - 1) % 4
+    elif instruction == "R":
+        return x, y, (cur_dir + 1) % 4
+    elif instruction == 'F':
+        mapping = {0: (-1, 0),
+                   1: (0, 1),
+                   2: (1, 0),
+                   3: (0, -1)}
+        nx, ny = (x + mapping[cur_dir][0], y + mapping[cur_dir][1])
+        return nx, ny, cur_dir
+
+
+def is_obstacle(grid, x, y):
+    return grid[x][y] == 1
+
+
 def next_cell(grid, x, y, cur_dir):
     if cur_dir == 0:
         return x - 1, y
@@ -31,7 +49,7 @@ def search_bfs(grid, start, end):
             q.append(((nx, ny), new_path))
             visited.add((nx, ny))
 
-    return -1
+    return []
 
 
 def create_graph(grid):
