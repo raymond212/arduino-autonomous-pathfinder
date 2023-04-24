@@ -1,5 +1,6 @@
 from pathplanning import next_cell, search_bfs, create_graph, in_bound, convert_path_to_instructions, \
     calculate_turns, update_position
+from visualizer import display_grid
 
 
 def test_update_position():
@@ -21,10 +22,6 @@ def test_bfs_1():
     grid = [[0] * 3 for _ in range(3)]
     grid[1][0] = 1
     grid[1][2] = 1
-    # 000
-    # 101
-    # 000
-    # Shortest path: (0,0) -> (0,1) -> (1,1) -> (2,1) -> (2,2)
     path = search_bfs(grid, (0, 0), (2, 2))
     assert path == [(0, 0), (0, 1), (1, 1), (2, 1), (2, 2)]
 
@@ -34,6 +31,14 @@ def test_bfs_2():
             [0, 1, 0]]
     path = search_bfs(grid, (1, 0), (1, 2))
     assert path == [(1, 0), (0, 0), (0, 1), (0, 2), (1, 2)]
+
+
+def test_bfs_3():
+    grid = [[0, 0, 0],
+            [1, 0, 0],
+            [0, 1, 0]]
+    path = search_bfs(grid, (0, 0), (2, 0))
+    assert len(path) == 0
 
 
 def test_in_bound():
@@ -85,3 +90,7 @@ def test_convert_path_to_instructions_3():
     path = [(0, 0), (0, 1), (1, 1), (1, 2), (0, 2), (0, 3), (1, 3)]
     instructions = "".join(convert_path_to_instructions(path, 3, 0))
     assert instructions == "RRFRFLFLFRFRFRR"
+
+
+def test_convert_path_to_instructions_4():
+    assert len(convert_path_to_instructions([], 0, 0)) == 0
