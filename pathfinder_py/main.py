@@ -1,5 +1,5 @@
 import serial
-from pathplanning import next_cell, search_bfs, convert_path_to_instructions, in_bound, is_obstacle, update_position
+from pathplanning import next_cell, search_bfs, convert_path_to_instructions, in_bound, is_obstacle, update_position, clear_obstacles
 from visualizer import display_grid
 
 PORT = "COM4"  # "COM4" for BT, "COM6" for arduino
@@ -12,20 +12,10 @@ print("Connection established.")
 
 
 def main():
-    # command = ""
-    # while command != "Quit":
-    #     command = input()
-    #     write(arduino, command)
-    #     print(read(arduino))
-    #
-    # arduino.close()
-
     m, n = 5, 4
     # m, n = [int(x) for x in input("Rows, columns: ").split(" ")]
     grid = [[0] * n for _ in range(m)]
 
-    # x, y = 2, 0
-    # end = (4, 3)
     x, y = tuple([int(x) for x in input("Start coordinate: ").split(" ")])
     end = tuple([int(x) for x in input("Target coordinate: ").split(" ")])
     cur_dir = int(input("Start direction: "))
@@ -42,34 +32,41 @@ def main():
         else:
             print("Invalid location.")
 
-    display_grid(grid, x, y, cur_dir)
-    print("Grid initialized.")
+
 
     path = search_bfs(grid, (x, y), end)
     instructions = convert_path_to_instructions(path, cur_dir, end_dir)
-
+    display_grid(grid, cur_dir, path)
     print("".join(instructions))
+
+    print("Grid initialized.")
     input("Enter S to start navigation.")
 
     while (x, y) != end or cur_dir != end_dir:
-        if grid_is_outdated(grid, x, y, cur_dir):
-            print("Grid Updated. New grid:")
-            display_grid(grid, x, y, cur_dir)
+        if len(instructions) == 0:
+            print("No path found. Clearing obstacles and exploring.")
+            clear_obstacles(grid)
 
             path = search_bfs(grid, (x, y), end)
-            if len(path) == 0:
-                print("No path found. Quitting...")
-                return
-
             instructions = convert_path_to_instructions(path, cur_dir, end_dir)
+
+        if grid_is_outdated(grid, x, y, cur_dir):
+            print("Grid Updated. New grid:")
+
+            path = search_bfs(grid, (x, y), end)
+            instructions = convert_path_to_instructions(path, cur_dir, end_dir)
+
+            display_grid(grid, cur_dir, path)
 
         instruction = instructions.pop(0)
         print("Current instruction: {}".format(instruction))
         execute_instruction(instruction)
-        print("Executed")
-        # print("{} {} {}".format(x, y, cur_dir))
+
+        if instruction == "F":
+            path.pop(0)
+
         x, y, cur_dir = update_position(x, y, cur_dir, instruction)
-        display_grid(grid, x, y, cur_dir)
+        display_grid(grid, cur_dir, path)
 
     print("Destination reached.")
 
@@ -85,7 +82,7 @@ def grid_is_outdated(grid, x, y, cur_dir):
         return False
     write("D")
     sees_obstacle = read()
-    print(sees_obstacle)
+    # print(sees_obstacle)
     if sees_obstacle == "Yes":
         if is_obstacle(grid, nx, ny):
             return False
@@ -115,51 +112,27 @@ def read():
 
 
 def test():
-    grid = [[0, 0, 0],
-            [0, 0, 0]]
-    display_grid(grid, 0, 1, 0)
-
-    # while True:
-    #
-    #
+    with open("mydata.txt", "w") as f:
+        f.write("{}".format([0, 1, 2]))
 
 
 # test()
-command = ""
-while command != "quit":
 
+
+command = ""
+
+while command != "quit":
     command = input("Navigate again?\n")
     if command == "override":
         while True:
-            instruction = input()
-            if instruction == "quit":
+            s = input()
+            if s == "quit":
                 break
-            elif instruction == "D":
+            elif s == "D":
                 write("D")
-                sees_obstacle = read()
-                arduino.flushInput()
-                print(sees_obstacle)
+                obstacle = read()
+                print(obstacle)
             else:
-                execute_instruction(instruction)
+                execute_instruction(s)
 
     main()
-
-# main()
-
-
-# m = 3
-# n = 3
-# grid = [[0] * m for _ in range(n)]
-# start = (0, 0)
-# end = (m - 1, n - 1)
-
-#
-#
-# grid = [[0, 0, 1, 0, 0, 0, 0, 0, 1, 0],
-#         [1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-#         [0, 0, 1, 0, 0, 1, 1, 1, 0, 0],
-#         [0, 1, 1, 0, 1, 0, 0, 0, 0, 0],
-#         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-#         [0, 0, 0, 1, 0, 0, 1, 0, 0, 0],
-#         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-#         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0], ]

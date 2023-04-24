@@ -3,6 +3,12 @@ from collections import deque
 DIRS = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
 
+def clear_obstacles(grid):
+    for x in range(len(grid)):
+        for y in range(len(grid[0])):
+            grid[x][y] = 0
+
+
 def update_position(x, y, cur_dir, instruction):
     if instruction == "L":
         return x, y, (cur_dir - 1) % 4
