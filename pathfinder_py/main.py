@@ -1,17 +1,69 @@
 import serial
-from pathplanning import next_cell, search_bfs, convert_path_to_instructions, in_bound, is_obstacle, update_position, clear_obstacles
+from serial import SerialException
+import cv2 as cv
+from time import sleep
+from threading import Thread
+
+from pathplanning import next_cell, search_bfs, convert_path_to_instructions, in_bound, update_position, \
+    clear_obstacles
 from visualizer import display_grid
+from vision import identify_obstacles
 
 PORT = "COM4"  # "COM4" for BT, "COM6" for arduino
 
 print("Welcome to Pathfinder.")
-print("Arduino connecting...")
-arduino = serial.Serial(PORT, 9600, timeout=2)
-arduino.flushInput()
-print("Connection established.")
+print("Connecting to Arduino...")
+
+try:
+    arduino = serial.Serial(PORT, 9600, timeout=2)
+    arduino.flushInput()
+    print("Connection established.")
+except SerialException:
+    print("Connection failed. Terminating...")
+
+obstacles = set()
+
+def stream_video():
+    cap = cv.VideoCapture(1)
+    while True:
+        success, frame = cap.read()
+
+        if not success:
+            break
+
+        global obstacles
+        obstacles = identify_obstacles(frame)
+        # cv.imshow('Video', frame)
+
+        # exits when q key is pressed
+        if cv.waitKey(20) & 0xFF == ord('q'):
+            break
+    cap.release()
+    cv.destroyAllWindows()
 
 
 def main():
+    print("[navigate] [override] [quit]")
+
+    command = input()
+    while command != "quit":
+        if command == "override":
+            while True:
+                s = input()
+                if s == "quit":
+                    break
+                elif s == "D":
+                    write("D")
+                    obstacle = read()
+                    print(obstacle)
+                else:
+                    execute_instruction(s)
+
+        navigate()
+        command = input("Navigate again?\n")
+
+
+def navigate():
     m, n = 5, 4
     # m, n = [int(x) for x in input("Rows, columns: ").split(" ")]
     grid = [[0] * n for _ in range(m)]
@@ -32,8 +84,6 @@ def main():
         else:
             print("Invalid location.")
 
-
-
     path = search_bfs(grid, (x, y), end)
     instructions = convert_path_to_instructions(path, cur_dir, end_dir)
     display_grid(grid, cur_dir, path)
@@ -49,7 +99,7 @@ def main():
 
             path = search_bfs(grid, (x, y), end)
             instructions = convert_path_to_instructions(path, cur_dir, end_dir)
-
+            continue
         if grid_is_outdated(grid, x, y, cur_dir):
             print("Grid Updated. New grid:")
 
@@ -57,7 +107,9 @@ def main():
             instructions = convert_path_to_instructions(path, cur_dir, end_dir)
 
             display_grid(grid, cur_dir, path)
-
+            # continue
+        if not instructions:
+            continue
         instruction = instructions.pop(0)
         print("Current instruction: {}".format(instruction))
         execute_instruction(instruction)
@@ -77,22 +129,44 @@ def execute_instruction(instruction):
 
 
 def grid_is_outdated(grid, x, y, cur_dir):
+    outdated = False
+
     nx, ny = next_cell(grid, x, y, cur_dir)
-    if not in_bound(grid, nx, ny):
-        return False
-    write("D")
-    sees_obstacle = read()
-    # print(sees_obstacle)
-    if sees_obstacle == "Yes":
-        if is_obstacle(grid, nx, ny):
-            return False
-        grid[nx][ny] = 1
-        return True
-    else:
-        if not is_obstacle(grid, nx, ny):
-            return False
-        grid[nx][ny] = 0
-        return True
+    # if in_bound(grid, nx, ny):
+    #     write("D")
+    #     sees_obstacle = read()
+    #     # print(sees_obstacle)
+    #     if sees_obstacle == "Yes":
+    #         if is_obstacle(grid, nx, ny):
+    #             outdated = False
+    #         else:
+    #             grid[nx][ny] = 1
+    #             outdated = True
+    #     else:
+    #         if not is_obstacle(grid, nx, ny):
+    #             outdated = False
+    #         else:
+    #             grid[nx][ny] = 0
+    #             outdated = True
+
+    # cap = cv.VideoCapture(1)
+    # success, frame = cap.read()
+    # obstacles = identify_obstacles(frame)
+
+    global obstacles
+
+    for i in range(len(grid)):
+        for j in range(len(grid[0])):
+            if grid[i][j] == 0 and (i, j) not in obstacles:
+                continue
+            elif grid[i][j] == 0 and (i, j) in obstacles:
+                grid[i][j] = 1
+                outdated = True
+            elif grid[i][j] == 1 and (i, j) not in obstacles:
+                grid[i][j] = 0
+                outdated = True
+
+    return outdated
 
 
 def read_instant():
@@ -118,21 +192,9 @@ def test():
 
 # test()
 
+if __name__ == "__main__":
+    t1 = Thread(target=stream_video, args=())
+    t2 = Thread(target=main, args=())
 
-command = ""
-
-while command != "quit":
-    command = input("Navigate again?\n")
-    if command == "override":
-        while True:
-            s = input()
-            if s == "quit":
-                break
-            elif s == "D":
-                write("D")
-                obstacle = read()
-                print(obstacle)
-            else:
-                execute_instruction(s)
-
-    main()
+    t1.start()
+    t2.start()
