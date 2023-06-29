@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import math
+from time import sleep
 
 RED = (0, 0, 255)
 GREEN = (0, 255, 0)
@@ -59,36 +60,78 @@ def get_coordinates(a, rows, cols):
             col = j
     return (row, col)
 
+def identify_car_location(img):
+    canny = cv.Canny(img, 100, 175)
+    cv.imshow('Canny', canny)
 
-def identify_obstacles(img):
-    # Pre-processing
+    contours, hierarchies = cv.findContours(canny, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    # print(f'{len(contours)} contour(s) found')
+    
+    
+    blank = np.zeros(img.shape, dtype='uint8')
+
+    for i in range(len(contours)):
+        cnt = contours[i]
+        area = cv.contourArea(cnt)
+        # if cv.contourArea(cnt) < 300:
+        if (100 < area < 1000) and len(cv.approxPolyDP(cnt,0.05*cv.arcLength(cnt, True), True)) == 3:
+            # print(area)
+            cv.drawContours(blank, [cnt], 0, GREEN, 1)
+            cv.imshow("Contour", blank)
+            M = cv.moments(cnt)
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            return (cx, cy)
+        # cnt = contours[i]
+        # 
+        # cv.imshow(f"Contour{i}", blank)
+
+    # cv.drawContours(blank, contours, 0, GREEN, 1)
+    return (-1, -1)
+
+def process(img):
+    cv.imshow('Original', img)
 
     scaled = rescale_frame(img, 1)
-    cv.imshow("Scaled", scaled)
-
-    # cv.rectangle(scaled, (240, 30), (320, 100), WHITE, thickness=-1)
-    # cv.rectangle(scaled, (240, 30), (320, 100), BLACK, thickness=3)
 
     cropped = scaled
     # cropped = img[30:420, 150:520]
 
-    # adjusted = cv.convertScaleAbs(cropped, alpha=1, beta=50)
-    # cv.imshow('Adjused', adjusted)
+    gray = cropped
+    # gray = cv.cvtColor(cropped, cv.COLOR_BGR2GRAY)
+    # cv.imshow('Gray', gray)
 
-    gray = cv.cvtColor(cropped, cv.COLOR_BGR2GRAY)
-    cv.imshow('Gray', gray)
+    blur = gray
+    # blur = cv.medianBlur(gray, 0)
+    # cv.imshow('Blur', blur)
 
-    blur = cv.medianBlur(gray, 5)
-    cv.imshow('Blur', blur)
+    return blur
 
-    canny = cv.Canny(blur, 100, 175)
-    cv.imshow('Canny', canny)
+
+
+def identify_obstacles(img):
+
+    processed = process(img)
+
+    car_x, car_y = identify_car_location(processed)
+    # print((car_x, car_y))
+
+    if (car_x, car_y) != (-1, -1):
+        car_w = 100
+        car_h = 100
+        cv.rectangle(processed, (car_x - car_w // 2, car_y - car_h // 2), (car_x + car_w // 2, car_y + car_h // 2), RED, thickness=-1)
+        cv.rectangle(processed, (car_x - car_w // 2, car_y - car_h // 2), (car_x + car_w // 2, car_y + car_h // 2), BLACK, thickness=3)
+    
+    cv.imshow('Processed', processed)
+
+    canny = cv.Canny(processed, 100, 175)
+    cv.imshow('Canny', canny)    
 
     contours, hierarchies = cv.findContours(canny, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
     # print(f'{len(contours)} contour(s) found')
 
     # blank = scaled
-    blank = np.zeros(cropped.shape, dtype='uint8')
+    blank = np.zeros(processed.shape, dtype='uint8')
 
     # cv.line(blank, (0,0), (150,20), RED, 1)
     # cv.line(blank, (640,480), (520,410), RED, 1)
@@ -102,7 +145,9 @@ def identify_obstacles(img):
         x, y, w, h = cv.boundingRect(cnt)
         area = w * h
         ratio = float(w) / h
-        if area > 5000 and area < 50000 and 0.5 <= ratio and 0.5 <= (1 / ratio):
+        if tuple(processed[y + h // 2][x + w // 2]) == RED:
+            continue
+        elif area > 5000 and area < 50000 and 0.5 <= ratio and 0.5 <= (1 / ratio):
             cv.rectangle(blank, (x, y), (x + w, y + h), GREEN, thickness=1)
             insert_into_clusters((x, y), clusters)
             insert_into_clusters((x + w, y), clusters)
@@ -149,11 +194,11 @@ def identify_obstacles(img):
     # print(cols)
     # print(rows)
 
-    # for row in rows:
-    #     cv.line(blank, (0,row), (scaled.shape[1],row), RED, thickness=1)
+    for row in rows:
+        cv.line(blank, (0,row), (processed.shape[1], row), RED, thickness=1)
 
-    # for column in cols:
-    #     cv.line(blank, (column,0), (column,scaled.shape[0]), RED, thickness=1)
+    for column in cols:
+        cv.line(blank, (column,0), (column, processed.shape[0]), RED, thickness=1)
 
     obstacle_coordinates = set()
     for obstacle in obstacles:
@@ -170,6 +215,11 @@ def identify_obstacles(img):
 
 def main():
     cap = cv.VideoCapture(1)
+    # success, frame = cap.read()
+    # identify_obstacles(frame)
+    # while True:
+    #     if cv.waitKey(20) & 0xFF == ord('q'):
+    #         break
     while True:
         success, frame = cap.read()
 

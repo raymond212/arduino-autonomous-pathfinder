@@ -1,8 +1,8 @@
 CAR_ORIENTATION = ["▲", "▶", "▼", "◀"]
 ADJACENT = {(-1, 0): "A",
-                    (0, 1): "B",
-                    (1, 0): "C",
-                    (0, -1): "D"}
+            (0, 1): "B",
+            (1, 0): "C",
+            (0, -1): "D"}
 ARROWS = {("A", "B"): "↘",
           ("A", "C"): "↓",
           ("A", "D"): "↙",
@@ -33,7 +33,7 @@ def display_grid(grid, cur_dir, path):
                 idx = path.index((x, y))
                 px, py = path[idx - 1]
                 nx, ny = path[idx + 1]
-                s += "|" + ARROWS[ADJACENT[(px - x, py - y)],ADJACENT[(nx - x, ny - y)]]
+                s += "|" + ARROWS[ADJACENT[(px - x, py - y)], ADJACENT[(nx - x, ny - y)]]
             else:
                 s += "|" + str(grid[x][y])
         s += "|\n"
